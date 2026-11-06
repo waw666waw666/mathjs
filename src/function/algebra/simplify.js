@@ -130,6 +130,9 @@ export const createSimplify = /* #__PURE__ */ factory(name, dependencies, (
    *  - `fractionsLimit` (10000): when `exactFractions` is true, constants will
    *    be expressed as fractions only when both numerator and denominator
    *    are smaller than `fractionsLimit`.
+   *  - `maxIterations` (200): maximum number of outer rewrite passes. Exact
+   *    cycles are already stopped by a visited-set; this caps rule
+   *    interactions that grow an expression unboundedly (see #3693).
    *
    * Syntax:
    *
@@ -386,6 +389,10 @@ export const createSimplify = /* #__PURE__ */ factory(name, dependencies, (
       assuming: { multiply: { commutative: true } } // o.w. / not conventional
     },
     { l: 'n^1', r: 'n' }, // can be produced by power cancellation
+    // Collapse 1^n after undo rules may have rebuilt it (e.g. from 1*x^(-1)).
+    // simplifyCore already does this mid-pass; repeating here keeps the final
+    // form free of redundant 1^factors (#3693).
+    { l: '1^n', r: '1' },
     {
       s: 'n*(n1/n2) -> (n*n1)/n2', // '*' before '/'
       assuming: { multiply: { associative: true } }
@@ -523,13 +530,21 @@ export const createSimplify = /* #__PURE__ */ factory(name, dependencies, (
 
   function _simplify (expr, rules, scope = createEmptyMap(), options = {}) {
     const debug = options.consoleDebug
+    // Cap outer rewrite passes. The visited-set stops exact cycles, but some
+    // rule interactions grow an expression unboundedly (new string every
+    // pass), e.g. collecting 1^y factors into 1^(k*y) with rising k (#3693).
+    // Default is high enough that normal expressions finish; override via
+    // options.maxIterations.
+    const maxIterations = options.maxIterations ?? 200
     rules = _buildRules(rules || simplify.rules, options.context)
     let res = resolve(expr, scope)
     res = removeParens(res)
     const visited = {}
     let str = res.toString({ parenthesis: 'all' })
-    while (!visited[str]) {
+    let iterations = 0
+    while (!visited[str] && iterations < maxIterations) {
       visited[str] = true
+      iterations++
       _lastsym = 0 // counter for placeholder symbols
       let laststr = str
       if (debug) console.log('Working on: ', str)

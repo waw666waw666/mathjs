@@ -144,4 +144,11 @@ describe('simplifyCore', function () {
     testSimplifyCore('a + -0', 'a')
     testSimplifyCore('-(-x - y)', 'y + x')
   })
+
+  it('simplifies 1^n to 1', function () {
+    // Without this, (1*x)^y -> 1^y * x^y leaves a 1^y that later grows (#3693)
+    testSimplifyCore('1^x', '1')
+    testSimplifyCore('1^(1/(y-1))', '1')
+    testSimplifyCore('1^(a+b)', '1')
+  })
 })

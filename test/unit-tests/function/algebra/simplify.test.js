@@ -717,4 +717,20 @@ describe('simplify', function () {
     assert(!isNaN(posex.evaluate(zeroes)))
     assert.notEqual(expr.evaluate(zeroes), posex.evaluate(zeroes))
   })
+
+  it('does not hang when simplifying (1/(x*(y-1)))^(1/(y-1)) (#3693)', function () {
+    // Previously, distributing the power produced 1^(k/(y-1)) factors whose
+    // exponent coefficient grew without bound, so the visited-set never hit a
+    // cycle and simplify never returned.
+    const result = math.simplify('(1/(x*(y-1)))^(1/(y-1))')
+    assert.ok(result)
+    // Must finish quickly and leave no 1^n factor behind.
+    assert.strictEqual(result.toString().includes('1 ^'), false)
+    assert.strictEqual(math.simplify('1^x').toString(), '1')
+    assert.strictEqual(math.simplify('1^(a+b)').toString(), '1')
+    // A few related forms that used to grow the same way:
+    assert.strictEqual(
+      math.simplify('((1*x)*(y-1))^(-1/(y-1))').toString().includes('1 ^'),
+      false)
+  })
 })

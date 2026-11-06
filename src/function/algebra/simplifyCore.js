@@ -234,6 +234,14 @@ export const createSimplifyCore = /* #__PURE__ */ factory(name, dependencies, ({
         return new OperatorNode(node.op, node.fn, [a0, a1])
       }
       if (node.op === '^') {
+        // 1^n is always 1 (for every complex n). Without this, rules that
+        // distribute powers over products like (1*x)^y -> 1^y * x^y leave a
+        // 1^y factor; later like-factor collection then grows that exponent
+        // unboundedly (1^y * 1^y -> 1^(2y) -> ...) and simplify never
+        // terminates — see #3693.
+        if (isConstantNode(a0) && equal(a0.value, 1)) {
+          return node1
+        }
         if (isConstantNode(a1)) {
           if (isZero(a1.value)) {
             return node1
